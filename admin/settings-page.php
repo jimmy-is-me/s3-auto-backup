@@ -6,12 +6,14 @@ if (isset($_POST['s3ab_save_settings'])) {
     check_admin_referer('s3ab_settings');
     
     // S3 設定
+    $endpoint = sanitize_text_field($_POST['s3_endpoint'] ?? '');
+    // 如果 endpoint 為空，則使用 AWS S3
+    // 如果 endpoint 包含 bucket，需要正確處理
     update_option('s3ab_s3_settings', array(
-        'endpoint' => sanitize_text_field($_POST['s3_endpoint']),
-        'bucket' => sanitize_text_field($_POST['s3_bucket']),
-        'access_key' => sanitize_text_field($_POST['s3_access_key']),
-        'secret_key' => sanitize_text_field($_POST['s3_secret_key']),
-        'region' => sanitize_text_field($_POST['s3_region']),
+        'endpoint' => $endpoint,
+        'bucket' => sanitize_text_field($_POST['s3_bucket'] ?? ''),
+        'access_key' => sanitize_text_field($_POST['s3_access_key'] ?? ''),
+        'secret_key' => sanitize_text_field($_POST['s3_secret_key'] ?? ''),
     ));
     
     // 備份設定
@@ -42,8 +44,8 @@ $settings = get_option('s3ab_settings', array());
             <tr>
                 <th>S3 Endpoint</th>
                 <td>
-                    <input type="text" name="s3_endpoint" value="<?php echo esc_attr($s3_settings['endpoint'] ?? ''); ?>" class="regular-text" placeholder="https://s3.ap-southeast-1.amazonaws.com">
-                    <p class="description">留空則使用 AWS S3,或填入 S3-Compatible 服務的 endpoint</p>
+                    <input type="text" name="s3_endpoint" value="<?php echo esc_attr($s3_settings['endpoint'] ?? ''); ?>" class="regular-text" placeholder="https://s3.ap-southeast-1.amazonaws.com 或 https://nyc3.digitaloceanspaces.com">
+                    <p class="description"><strong>必填</strong>：填入 S3-Compatible 服務的完整 endpoint URL（例如：https://s3.ap-southeast-1.amazonaws.com 或 https://nyc3.digitaloceanspaces.com）。留空將無法連線。</p>
                 </td>
             </tr>
             <tr>
@@ -62,12 +64,6 @@ $settings = get_option('s3ab_settings', array());
                 <th>Secret Key *</th>
                 <td>
                     <input type="password" name="s3_secret_key" value="<?php echo esc_attr($s3_settings['secret_key'] ?? ''); ?>" class="regular-text" required>
-                </td>
-            </tr>
-            <tr>
-                <th>Region</th>
-                <td>
-                    <input type="text" name="s3_region" value="<?php echo esc_attr($s3_settings['region'] ?? 'us-east-1'); ?>" class="regular-text">
                 </td>
             </tr>
         </table>

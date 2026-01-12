@@ -70,50 +70,36 @@ try {
             <?php endif; ?>
         </tbody>
     </table>
+    
+    <h2>備份日誌</h2>
+    <div id="s3ab-logs" class="s3ab-logs-container">
+        <div class="s3ab-logs-content" id="s3ab-logs-content">
+            <p class="description">備份日誌將顯示在這裡</p>
+        </div>
+        <button class="button" id="s3ab-refresh-logs">重新整理日誌</button>
+    </div>
+    
+    <h2>上傳備份檔案還原</h2>
+    <div class="s3ab-upload-restore">
+        <form id="s3ab-upload-form" enctype="multipart/form-data">
+            <table class="form-table">
+                <tr>
+                    <th><label for="s3ab-backup-file">選擇備份檔案</label></th>
+                    <td>
+                        <input type="file" name="backup_file" id="s3ab-backup-file" accept=".zip" required>
+                        <p class="description">請上傳完整的備份 ZIP 檔案（包含 database.sql.gz 和 files.zip）</p>
+                    </td>
+                </tr>
+            </table>
+            <p class="submit">
+                <button type="submit" class="button button-primary">上傳並還原</button>
+            </p>
+        </form>
+        <div id="s3ab-upload-progress" style="display:none;">
+            <div class="s3ab-progress-bar">
+                <div class="s3ab-progress-fill"></div>
+            </div>
+            <div class="s3ab-progress-message"></div>
+        </div>
+    </div>
 </div>
-
-<style>
-.s3ab-admin {
-    max-width: 1200px;
-}
-
-.s3ab-actions {
-    margin: 20px 0;
-}
-
-.s3ab-actions .button {
-    margin-right: 10px;
-}
-
-.s3ab-actions .dashicons {
-    line-height: 28px;
-}
-
-#s3ab-progress {
-    margin: 20px 0;
-    padding: 15px;
-    background: #fff;
-    border: 1px solid #ccd0d4;
-    border-radius: 4px;
-}
-
-.s3ab-progress-bar {
-    height: 30px;
-    background: #f0f0f1;
-    border-radius: 4px;
-    overflow: hidden;
-    margin-bottom: 10px;
-}
-
-.s3ab-progress-fill {
-    height: 100%;
-    background: #2271b1;
-    transition: width 0.3s;
-    width: 0%;
-}
-
-.s3ab-progress-message {
-    font-size: 14px;
-    color: #50575e;
-}
-</style>

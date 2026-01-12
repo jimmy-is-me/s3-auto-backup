@@ -275,13 +275,77 @@
    深色模式支援
    =============================================== */
 
+/* ===============================================
+   日誌容器
+   =============================================== */
+
+.s3ab-logs-container {
+    margin: 20px 0;
+}
+
+.s3ab-logs-content {
+    background: #fff;
+    border: 1px solid #ccd0d4;
+    border-radius: 4px;
+    padding: 15px;
+    max-height: 400px;
+    overflow-y: auto;
+    margin-bottom: 10px;
+}
+
+.s3ab-logs-content table {
+    margin: 0;
+}
+
+.s3ab-logs-content .log-type-ERROR {
+    color: #d63638;
+    font-weight: 600;
+}
+
+.s3ab-logs-content .log-type-WARNING {
+    color: #dba617;
+    font-weight: 600;
+}
+
+.s3ab-logs-content .log-type-INFO {
+    color: #2271b1;
+}
+
+.s3ab-logs-content .log-type-SUCCESS {
+    color: #00a32a;
+}
+
+/* ===============================================
+   上傳還原
+   =============================================== */
+
+.s3ab-upload-restore {
+    margin: 20px 0;
+    padding: 20px;
+    background: #fff;
+    border: 1px solid #ccd0d4;
+    border-radius: 4px;
+}
+
+.s3ab-upload-restore .form-table {
+    margin-top: 0;
+}
+
+.s3ab-upload-restore input[type="file"] {
+    padding: 5px;
+    border: 1px solid #8c8f94;
+    border-radius: 3px;
+}
+
 @media (prefers-color-scheme: dark) {
     .s3ab-admin {
         color: #e0e0e0;
     }
     
     #s3ab-progress,
-    .s3ab-stat-card {
+    .s3ab-stat-card,
+    .s3ab-logs-content,
+    .s3ab-upload-restore {
         background: #1e1e1e;
         border-color: #3c3c3c;
     }

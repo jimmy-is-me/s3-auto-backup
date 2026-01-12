@@ -267,11 +267,17 @@ class S3AB_Backup {
         rmdir($dir);
     }
     
-    private function log($message) {
+    private function log($message, $type = 'info') {
         $this->log[] = array(
             'time' => current_time('mysql'),
             'message' => $message,
+            'type' => $type,
         );
+        
+        // 使用 Logger 類別記錄
+        if (class_exists('S3AB_Logger')) {
+            S3AB_Logger::log($message, $type);
+        }
         
         error_log('[S3 Auto Backup] ' . $message);
     }

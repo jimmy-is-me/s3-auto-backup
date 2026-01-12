@@ -9,23 +9,60 @@ class S3AB_S3_Uploader {
     private $region;
     
     public function __construct() {
-        $s3_settings = get_option('s3ab_s3_settings');
+        $s3_settings = get_option('s3ab_s3_settings', array());
         
-        $this->endpoint = $s3_settings['endpoint'] ?? '';
-        $this->bucket = $s3_settings['bucket'] ?? '';
-        $this->access_key = $s3_settings['access_key'] ?? '';
-        $this->secret_key = $s3_settings['secret_key'] ?? '';
-        $this->region = $s3_settings['region'] ?? 'us-east-1';
+        $this->endpoint = isset($s3_settings['endpoint']) ? trim($s3_settings['endpoint']) : '';
+        $this->bucket = isset($s3_settings['bucket']) ? trim($s3_settings['bucket']) : '';
+        $this->access_key = isset($s3_settings['access_key']) ? trim($s3_settings['access_key']) : '';
+        $this->secret_key = isset($s3_settings['secret_key']) ? trim($s3_settings['secret_key']) : '';
+        
+        // 從 endpoint 自動偵測 region，如果沒有則使用預設值
+        $this->region = $this->detect_region_from_endpoint();
+    }
+    
+    private function detect_region_from_endpoint() {
+        if (empty($this->endpoint)) {
+            return 'us-east-1'; // AWS S3 預設
+        }
+        
+        // 嘗試從 endpoint 提取 region
+        if (preg_match('/s3[\.-]([a-z0-9-]+)\.amazonaws\.com/', $this->endpoint, $matches)) {
+            return $matches[1];
+        }
+        
+        // 對於其他 S3-Compatible 服務，使用預設值
+        return 'us-east-1';
     }
     
     public function test_connection() {
         try {
+            if (empty($this->endpoint)) {
+                return array(
+                    'success' => false,
+                    'message' => '請先設定 S3 Endpoint',
+                );
+            }
+            
+            if (empty($this->bucket)) {
+                return array(
+                    'success' => false,
+                    'message' => '請先設定 Bucket 名稱',
+                );
+            }
+            
+            if (empty($this->access_key) || empty($this->secret_key)) {
+                return array(
+                    'success' => false,
+                    'message' => '請先設定 Access Key 和 Secret Key',
+                );
+            }
+            
             // 測試列出 bucket
             $result = $this->list_objects('', 1);
             
             return array(
                 'success' => true,
-                'message' => 'S3 連線成功!',
+                'message' => 'S3 連線成功! Endpoint: ' . $this->endpoint,
             );
         } catch (Exception $e) {
             return array(
@@ -203,9 +240,21 @@ class S3AB_S3_Uploader {
     
     private function get_url($key) {
         if (empty($this->endpoint)) {
-            return "https://{$this->bucket}.s3.{$this->region}.amazonaws.com/{$key}";
+            // 如果沒有 endpoint，使用 AWS S3 標準格式
+            return "https://{$this->bucket}.s3.{$this->region}.amazonaws.com/" . ltrim($key, '/');
+        }
+        
+        // 處理不同的 endpoint 格式
+        $endpoint = rtrim($this->endpoint, '/');
+        $key = ltrim($key, '/');
+        
+        // 檢查 endpoint 是否已經包含 bucket
+        if (strpos($endpoint, $this->bucket) !== false) {
+            // endpoint 已經包含 bucket（例如：https://bucket.nyc3.digitaloceanspaces.com）
+            return $endpoint . '/' . $key;
         } else {
-            return rtrim($this->endpoint, '/') . "/{$this->bucket}/{$key}";
+            // endpoint 不包含 bucket（例如：https://nyc3.digitaloceanspaces.com）
+            return $endpoint . '/' . $this->bucket . '/' . $key;
         }
     }
     

@@ -55,6 +55,7 @@ $required_files = array(
     'includes/class-restore.php',
     'includes/class-s3-uploader.php',
     'includes/class-scheduler.php',
+    'includes/class-logger.php',
 );
 
 foreach ($required_files as $file) {
@@ -100,6 +101,8 @@ class S3_Auto_Backup {
         add_action('wp_ajax_s3ab_list_backups', array($this, 'ajax_list_backups'));
         add_action('wp_ajax_s3ab_delete_backup', array($this, 'ajax_delete_backup'));
         add_action('wp_ajax_s3ab_test_connection', array($this, 'ajax_test_connection'));
+        add_action('wp_ajax_s3ab_get_logs', array($this, 'ajax_get_logs'));
+        add_action('wp_ajax_s3ab_upload_restore', array($this, 'ajax_upload_restore'));
         
         // WP-Cron 排程
         add_action('s3ab_scheduled_backup', array($this, 'run_scheduled_backup'));
@@ -303,6 +306,76 @@ class S3_Auto_Backup {
         
         if ($result['success']) {
             wp_send_json_success($result['message']);
+        } else {
+            wp_send_json_error($result['message']);
+        }
+    }
+    
+    public function ajax_get_logs() {
+        check_ajax_referer('s3ab_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error('權限不足');
+        }
+        
+        $lines = isset($_POST['lines']) ? intval($_POST['lines']) : 100;
+        $logs = S3AB_Logger::get_logs($lines);
+        
+        wp_send_json_success($logs);
+    }
+    
+    public function ajax_upload_restore() {
+        check_ajax_referer('s3ab_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error('權限不足');
+        }
+        
+        if (!isset($_FILES['backup_file']) || $_FILES['backup_file']['error'] !== UPLOAD_ERR_OK) {
+            wp_send_json_error('上傳失敗或檔案不存在');
+        }
+        
+        $upload_dir = S3AB_BACKUP_DIR . 'upload-restore-' . time() . '/';
+        if (!wp_mkdir_p($upload_dir)) {
+            wp_send_json_error('無法建立上傳目錄');
+        }
+        
+        $file = $_FILES['backup_file'];
+        $file_name = sanitize_file_name($file['name']);
+        
+        if (pathinfo($file_name, PATHINFO_EXTENSION) !== 'zip') {
+            wp_send_json_error('只支援 ZIP 檔案格式');
+        }
+        
+        $target_file = $upload_dir . $file_name;
+        
+        if (!move_uploaded_file($file['tmp_name'], $target_file)) {
+            wp_send_json_error('無法移動上傳的檔案');
+        }
+        
+        // 解壓縮檔案
+        if (!class_exists('ZipArchive')) {
+            wp_send_json_error('ZipArchive 擴充功能未安裝');
+        }
+        
+        $zip = new ZipArchive();
+        if ($zip->open($target_file) !== true) {
+            wp_send_json_error('無法開啟 ZIP 檔案');
+        }
+        
+        $zip->extractTo($upload_dir);
+        $zip->close();
+        
+        // 執行還原
+        $restore = new S3AB_Restore();
+        $result = $restore->restore_from_directory($upload_dir);
+        
+        // 清理上傳檔案
+        array_map('unlink', glob($upload_dir . '*'));
+        @rmdir($upload_dir);
+        
+        if ($result['success']) {
+            wp_send_json_success($result);
         } else {
             wp_send_json_error($result['message']);
         }

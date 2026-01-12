@@ -6,6 +6,39 @@ class S3AB_Restore {
     private $restore_dir;
     private $log = array();
     
+    public function restore_from_directory($directory) {
+        try {
+            $this->restore_dir = rtrim($directory, '/') . '/';
+            
+            if (!is_dir($this->restore_dir)) {
+                throw new Exception('還原目錄不存在');
+            }
+            
+            $this->log('開始從上傳檔案還原...');
+            
+            // 還原資料庫
+            $this->restore_database();
+            
+            // 還原檔案
+            $this->restore_files();
+            
+            $this->log('還原完成');
+            
+            return array(
+                'success' => true,
+                'log' => $this->log,
+            );
+            
+        } catch (Exception $e) {
+            $this->log('錯誤: ' . $e->getMessage());
+            return array(
+                'success' => false,
+                'message' => $e->getMessage(),
+                'log' => $this->log,
+            );
+        }
+    }
+    
     public function start($backup_id) {
         try {
             $this->backup_id = $backup_id;

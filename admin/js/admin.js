@@ -133,4 +133,96 @@ jQuery(document).ready(function($) {
     $('#s3ab-refresh-list').on('click', function() {
         location.reload();
     });
+    
+    // 載入日誌
+    function loadLogs() {
+        $.ajax({
+            url: s3abAjax.ajax_url,
+            type: 'POST',
+            data: {
+                action: 's3ab_get_logs',
+                lines: 100,
+                nonce: s3abAjax.nonce
+            },
+            success: function(response) {
+                if (response.success && response.data.length > 0) {
+                    let html = '<table class="wp-list-table widefat fixed striped"><thead><tr><th>時間</th><th>類型</th><th>訊息</th></tr></thead><tbody>';
+                    response.data.forEach(function(log) {
+                        const typeClass = log.type.toLowerCase();
+                        html += '<tr class="log-' + typeClass + '">';
+                        html += '<td>' + log.time + '</td>';
+                        html += '<td><span class="log-type-' + typeClass + '">' + log.type + '</span></td>';
+                        html += '<td>' + log.message + '</td>';
+                        html += '</tr>';
+                    });
+                    html += '</tbody></table>';
+                    $('#s3ab-logs-content').html(html);
+                } else {
+                    $('#s3ab-logs-content').html('<p class="description">尚無日誌記錄</p>');
+                }
+            }
+        });
+    }
+    
+    // 重新整理日誌
+    $('#s3ab-refresh-logs').on('click', function() {
+        loadLogs();
+    });
+    
+    // 初始載入日誌
+    loadLogs();
+    
+    // 上傳備份檔案還原
+    $('#s3ab-upload-form').on('submit', function(e) {
+        e.preventDefault();
+        
+        if (!confirm('⚠️ 警告: 還原備份將會覆蓋現有資料!\n\n確定要上傳並還原備份檔案嗎?')) {
+            return;
+        }
+        
+        const formData = new FormData(this);
+        formData.append('action', 's3ab_upload_restore');
+        formData.append('nonce', s3abAjax.nonce);
+        
+        const $progress = $('#s3ab-upload-progress');
+        const $progressFill = $progress.find('.s3ab-progress-fill');
+        const $progressMsg = $progress.find('.s3ab-progress-message');
+        
+        $progress.show();
+        $progressFill.css('width', '10%');
+        $progressMsg.html('<strong>上傳檔案中...</strong>');
+        
+        $.ajax({
+            url: s3abAjax.ajax_url,
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            xhr: function() {
+                const xhr = new window.XMLHttpRequest();
+                xhr.upload.addEventListener('progress', function(e) {
+                    if (e.lengthComputable) {
+                        const percentComplete = (e.loaded / e.total) * 100;
+                        $progressFill.css('width', percentComplete + '%');
+                        $progressMsg.html('<strong>上傳中... ' + Math.round(percentComplete) + '%</strong>');
+                    }
+                });
+                return xhr;
+            },
+            success: function(response) {
+                if (response.success) {
+                    $progressFill.css('width', '100%');
+                    $progressMsg.html('<strong style="color:green;">✅ 還原完成!</strong>');
+                    setTimeout(function() {
+                        location.reload();
+                    }, 2000);
+                } else {
+                    $progressMsg.html('<strong style="color:red;">❌ 還原失敗: ' + response.data + '</strong>');
+                }
+            },
+            error: function() {
+                $progressMsg.html('<strong style="color:red;">❌ 發生錯誤，請稍後再試</strong>');
+            }
+        });
+    });
 });
