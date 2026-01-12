@@ -290,14 +290,21 @@ class S3AB_S3_Uploader {
         $host = $parsed_url['host'];
         
         // 構建 canonical URI
-        // 從完整 URL 中提取路徑，移除 bucket 部分（如果存在）
+        // 從完整 URL 中提取路徑
         $path = isset($parsed_url['path']) ? $parsed_url['path'] : '/';
         
-        // 如果路徑包含 bucket，移除它（因為 canonical URI 不應包含 bucket）
-        $bucket_prefix = '/' . $this->bucket;
-        if (strpos($path, $bucket_prefix) === 0) {
-            $path = substr($path, strlen($bucket_prefix));
+        // 對於某些 S3-Compatible 服務，路徑可能已經包含 bucket
+        // 我們需要根據 endpoint 的格式來決定是否包含 bucket
+        $is_aws_s3 = empty($this->endpoint) || strpos($this->endpoint, 'amazonaws.com') !== false;
+        
+        if ($is_aws_s3) {
+            // AWS S3: canonical URI 不應包含 bucket
+            $bucket_prefix = '/' . $this->bucket;
+            if (strpos($path, $bucket_prefix) === 0) {
+                $path = substr($path, strlen($bucket_prefix));
+            }
         }
+        // 對於其他 S3-Compatible 服務，保持路徑不變（可能包含 bucket）
         
         // 確保以 / 開頭
         if (empty($path) || $path[0] !== '/') {

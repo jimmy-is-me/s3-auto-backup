@@ -56,6 +56,7 @@ $required_files = array(
     'includes/class-s3-uploader.php',
     'includes/class-scheduler.php',
     'includes/class-logger.php',
+    'includes/class-local-backup.php',
 );
 
 foreach ($required_files as $file) {
@@ -373,6 +374,60 @@ class S3_Auto_Backup {
         // 清理上傳檔案
         array_map('unlink', glob($upload_dir . '*'));
         @rmdir($upload_dir);
+        
+        if ($result['success']) {
+            wp_send_json_success($result);
+        } else {
+            wp_send_json_error($result['message']);
+        }
+    }
+    
+    public function ajax_delete_local_backup() {
+        check_ajax_referer('s3ab_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error('權限不足');
+        }
+        
+        $backup_id = isset($_POST['backup_id']) ? sanitize_text_field($_POST['backup_id']) : '';
+        
+        if (empty($backup_id)) {
+            wp_send_json_error('備份 ID 不能為空');
+        }
+        
+        if (class_exists('S3AB_Local_Backup')) {
+            $result = S3AB_Local_Backup::delete_backup($backup_id);
+            if ($result) {
+                wp_send_json_success('本地備份已刪除');
+            } else {
+                wp_send_json_error('刪除失敗');
+            }
+        } else {
+            wp_send_json_error('本地備份功能不可用');
+        }
+    }
+    
+    public function ajax_restore_local_backup() {
+        check_ajax_referer('s3ab_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error('權限不足');
+        }
+        
+        $backup_id = isset($_POST['backup_id']) ? sanitize_text_field($_POST['backup_id']) : '';
+        
+        if (empty($backup_id)) {
+            wp_send_json_error('備份 ID 不能為空');
+        }
+        
+        $backup_dir = S3AB_BACKUP_DIR . $backup_id . '/';
+        
+        if (!is_dir($backup_dir)) {
+            wp_send_json_error('本地備份不存在');
+        }
+        
+        $restore = new S3AB_Restore();
+        $result = $restore->restore_from_directory($backup_dir);
         
         if ($result['success']) {
             wp_send_json_success($result);

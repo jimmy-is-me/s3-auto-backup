@@ -1,14 +1,27 @@
 <?php
 if (!defined('ABSPATH')) exit;
 
-$backups = array();
-$s3 = new S3AB_S3_Uploader();
+$s3_backups = array();
+$local_backups = array();
 
+// 載入 S3 備份
+$s3 = new S3AB_S3_Uploader();
 try {
-    $backups = $s3->list_backups();
+    $s3_backups = $s3->list_backups();
+    foreach ($s3_backups as &$backup) {
+        $backup['type'] = 's3';
+    }
 } catch (Exception $e) {
-    echo '<div class="notice notice-error"><p>無法載入備份清單: ' . esc_html($e->getMessage()) . '</p></div>';
+    echo '<div class="notice notice-error"><p>無法載入 S3 備份清單: ' . esc_html($e->getMessage()) . '</p></div>';
 }
+
+// 載入本地備份
+if (class_exists('S3AB_Local_Backup')) {
+    $local_backups = S3AB_Local_Backup::list_backups();
+}
+
+// 合併備份列表
+$backups = array_merge($s3_backups, $local_backups);
 ?>
 
 <div class="wrap s3ab-admin">
@@ -46,12 +59,25 @@ try {
     
     <h2>備份清單</h2>
     
+    <div style="margin-bottom: 15px;">
+        <label>
+            <input type="radio" name="backup-filter" value="all" checked> 全部備份
+        </label>
+        <label style="margin-left: 15px;">
+            <input type="radio" name="backup-filter" value="s3"> S3 備份
+        </label>
+        <label style="margin-left: 15px;">
+            <input type="radio" name="backup-filter" value="local"> 本地備份
+        </label>
+    </div>
+    
     <table class="wp-list-table widefat fixed striped">
         <thead>
             <tr>
                 <th>備份 ID</th>
                 <th>日期時間</th>
                 <th>大小</th>
+                <th>位置</th>
                 <th>網站版本</th>
                 <th>操作</th>
             </tr>
@@ -59,20 +85,27 @@ try {
         <tbody id="s3ab-backup-list">
             <?php if (empty($backups)): ?>
                 <tr>
-                    <td colspan="5">尚無備份記錄</td>
+                    <td colspan="6">尚無備份記錄</td>
                 </tr>
             <?php else: ?>
                 <?php foreach ($backups as $backup): ?>
-                    <tr data-backup-id="<?php echo esc_attr($backup['id']); ?>">
+                    <tr data-backup-id="<?php echo esc_attr($backup['id']); ?>" data-backup-type="<?php echo esc_attr($backup['type'] ?? 's3'); ?>">
                         <td><code><?php echo esc_html($backup['id']); ?></code></td>
                         <td><?php echo esc_html($backup['date']); ?></td>
                         <td><?php echo esc_html($backup['size']); ?></td>
+                        <td>
+                            <?php if (($backup['type'] ?? 's3') === 'local'): ?>
+                                <span class="dashicons dashicons-admin-home" style="color: #2271b1;"></span> 本地
+                            <?php else: ?>
+                                <span class="dashicons dashicons-cloud" style="color: #00a32a;"></span> S3
+                            <?php endif; ?>
+                        </td>
                         <td>WP <?php echo esc_html($backup['metadata']['wp_version'] ?? 'N/A'); ?></td>
                         <td>
-                            <button class="button s3ab-restore" data-backup-id="<?php echo esc_attr($backup['id']); ?>">
+                            <button class="button s3ab-restore" data-backup-id="<?php echo esc_attr($backup['id']); ?>" data-backup-type="<?php echo esc_attr($backup['type'] ?? 's3'); ?>">
                                 還原
                             </button>
-                            <button class="button s3ab-delete" data-backup-id="<?php echo esc_attr($backup['id']); ?>">
+                            <button class="button s3ab-delete" data-backup-id="<?php echo esc_attr($backup['id']); ?>" data-backup-type="<?php echo esc_attr($backup['type'] ?? 's3'); ?>">
                                 刪除
                             </button>
                         </td>

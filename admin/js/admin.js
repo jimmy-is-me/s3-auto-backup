@@ -67,6 +67,7 @@ jQuery(document).ready(function($) {
     // 還原備份
     $(document).on('click', '.s3ab-restore', function() {
         const backupId = $(this).data('backup-id');
+        const backupType = $(this).data('backup-type') || 's3';
         
         if (!confirm('⚠️ 警告:還原備份將會覆蓋現有資料!\n\n確定要還原備份 ' + backupId + ' 嗎?')) {
             return;
@@ -75,14 +76,17 @@ jQuery(document).ready(function($) {
         const $btn = $(this);
         $btn.prop('disabled', true).text('還原中...');
         
+        const action = backupType === 'local' ? 's3ab_restore_local_backup' : 's3ab_restore_backup';
+        
         $.ajax({
             url: s3abAjax.ajax_url,
             type: 'POST',
             data: {
-                action: 's3ab_restore_backup',
+                action: action,
                 backup_id: backupId,
                 nonce: s3abAjax.nonce
             },
+            timeout: 600000,
             success: function(response) {
                 if (response.success) {
                     alert('✅ 還原完成!即將重新載入頁面...');
@@ -102,18 +106,20 @@ jQuery(document).ready(function($) {
     // 刪除備份
     $(document).on('click', '.s3ab-delete', function() {
         const backupId = $(this).data('backup-id');
+        const backupType = $(this).data('backup-type') || 's3';
         
         if (!confirm('確定要刪除備份 ' + backupId + ' 嗎?')) {
             return;
         }
         
         const $row = $(this).closest('tr');
+        const action = backupType === 'local' ? 's3ab_delete_local_backup' : 's3ab_delete_backup';
         
         $.ajax({
             url: s3abAjax.ajax_url,
             type: 'POST',
             data: {
-                action: 's3ab_delete_backup',
+                action: action,
                 backup_id: backupId,
                 nonce: s3abAjax.nonce
             },
@@ -121,10 +127,26 @@ jQuery(document).ready(function($) {
                 if (response.success) {
                     $row.fadeOut(function() {
                         $(this).remove();
+                        if ($('#s3ab-backup-list tr').length === 0) {
+                            $('#s3ab-backup-list').html('<tr><td colspan="6">尚無備份記錄</td></tr>');
+                        }
                     });
                 } else {
                     alert('刪除失敗: ' + response.data);
                 }
+            }
+        });
+    });
+    
+    // 備份篩選
+    $('input[name="backup-filter"]').on('change', function() {
+        const filter = $(this).val();
+        $('#s3ab-backup-list tr').each(function() {
+            const type = $(this).data('backup-type') || 's3';
+            if (filter === 'all' || filter === type) {
+                $(this).show();
+            } else {
+                $(this).hide();
             }
         });
     });

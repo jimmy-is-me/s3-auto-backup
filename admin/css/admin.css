@@ -19,9 +19,11 @@
 }
 
 .s3ab-actions .button-hero {
-    padding: 10px 30px;
+    padding: 12px 30px;
     height: auto;
     font-size: 16px;
+    line-height: 1.5;
+    min-height: 46px;
 }
 
 .s3ab-actions .button {
@@ -283,11 +285,16 @@
     margin: 5px 0;
     line-height: 1.6;
     font-size: 13px;
-    color: #50575e;
+    color: #1d2327;
+}
+
+.s3ab-info-box p {
+    color: #1d2327;
 }
 
 .s3ab-info-box strong {
-    color: #2271b1;
+    color: #1d2327;
+    font-weight: 600;
 }
 
 /* ===============================================
