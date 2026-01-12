@@ -4,28 +4,70 @@
  * Plugin URI: https://yoursite.com/s3-auto-backup
  * Description: 自動備份 WordPress 網站到 S3,支援一鍵還原
  * Version: 1.0.0
- * Author: Your Name
- * Author URI: https://yoursite.com
+ * Author: wumetax
+ * Author URI: https://wumetax.com/
  * License: GPL v2 or later
+ * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain: s3-auto-backup
+ * Domain Path: /languages
  */
 
 // 防止直接存取
 if (!defined('ABSPATH')) {
-    exit;
+    exit('Direct access forbidden.');
 }
 
 // 定義常數
 define('S3AB_VERSION', '1.0.0');
+define('S3AB_PLUGIN_FILE', __FILE__);
 define('S3AB_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('S3AB_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('S3AB_BACKUP_DIR', WP_CONTENT_DIR . '/s3-backups/');
 
-// 載入依賴
-require_once S3AB_PLUGIN_DIR . 'includes/class-backup.php';
-require_once S3AB_PLUGIN_DIR . 'includes/class-restore.php';
-require_once S3AB_PLUGIN_DIR . 'includes/class-s3-uploader.php';
-require_once S3AB_PLUGIN_DIR . 'includes/class-scheduler.php';
+// 檢查 PHP 版本
+if (version_compare(PHP_VERSION, '7.4', '<')) {
+    add_action('admin_notices', function() {
+        echo '<div class="error"><p><strong>S3 Auto Backup Pro</strong> 需要 PHP 7.4 或更高版本。目前版本: ' . PHP_VERSION . '</p></div>';
+    });
+    return;
+}
+
+// 檢查必要的 PHP 擴充功能
+$required_extensions = array('zip', 'curl', 'simplexml');
+$missing_extensions = array();
+
+foreach ($required_extensions as $ext) {
+    if (!extension_loaded($ext)) {
+        $missing_extensions[] = $ext;
+    }
+}
+
+if (!empty($missing_extensions)) {
+    add_action('admin_notices', function() use ($missing_extensions) {
+        echo '<div class="error"><p><strong>S3 Auto Backup Pro</strong> 需要以下 PHP 擴充功能: ' . implode(', ', $missing_extensions) . '</p></div>';
+    });
+    return;
+}
+
+// 載入依賴檔案 (確保檔案存在)
+$required_files = array(
+    'includes/class-backup.php',
+    'includes/class-restore.php',
+    'includes/class-s3-uploader.php',
+    'includes/class-scheduler.php',
+);
+
+foreach ($required_files as $file) {
+    $filepath = S3AB_PLUGIN_DIR . $file;
+    if (file_exists($filepath)) {
+        require_once $filepath;
+    } else {
+        add_action('admin_notices', function() use ($file) {
+            echo '<div class="error"><p><strong>S3 Auto Backup Pro</strong> 缺少必要檔案: ' . esc_html($file) . '</p></div>';
+        });
+        return;
+    }
+}
 
 // 主類別
 class S3_Auto_Backup {
@@ -41,10 +83,10 @@ class S3_Auto_Backup {
     
     private function __construct() {
         // 啟用外掛時的動作
-        register_activation_hook(__FILE__, array($this, 'activate'));
+        register_activation_hook(S3AB_PLUGIN_FILE, array($this, 'activate'));
         
         // 停用外掛時的動作
-        register_deactivation_hook(__FILE__, array($this, 'deactivate'));
+        register_deactivation_hook(S3AB_PLUGIN_FILE, array($this, 'deactivate'));
         
         // 載入管理介面
         add_action('admin_menu', array($this, 'add_admin_menu'));
@@ -73,6 +115,12 @@ class S3_Auto_Backup {
                 S3AB_BACKUP_DIR . '.htaccess',
                 "deny from all\n"
             );
+            
+            // 建立 index.php 保護
+            file_put_contents(
+                S3AB_BACKUP_DIR . 'index.php',
+                "<?php // Silence is golden"
+            );
         }
         
         // 設定預設選項
@@ -87,18 +135,21 @@ class S3_Auto_Backup {
             ));
         }
         
-        // 註冊排程
-        if (!wp_next_scheduled('s3ab_scheduled_backup')) {
-            wp_schedule_event(time(), 'daily', 's3ab_scheduled_backup');
+        if (!get_option('s3ab_s3_settings')) {
+            update_option('s3ab_s3_settings', array(
+                'endpoint' => '',
+                'bucket' => '',
+                'access_key' => '',
+                'secret_key' => '',
+                'region' => 'us-east-1',
+            ));
         }
     }
     
     public function deactivate() {
         // 移除排程
-        $timestamp = wp_next_scheduled('s3ab_scheduled_backup');
-        if ($timestamp) {
-            wp_unschedule_event($timestamp, 's3ab_scheduled_backup');
-        }
+        $scheduler = S3AB_Scheduler::get_instance();
+        $scheduler->clear_schedule();
     }
     
     public function add_admin_menu() {
@@ -158,14 +209,20 @@ class S3_Auto_Backup {
     }
     
     public function render_admin_page() {
-        include S3AB_PLUGIN_DIR . 'admin/admin-page.php';
+        if (file_exists(S3AB_PLUGIN_DIR . 'admin/admin-page.php')) {
+            include S3AB_PLUGIN_DIR . 'admin/admin-page.php';
+        }
     }
     
     public function render_settings_page() {
-        include S3AB_PLUGIN_DIR . 'admin/settings-page.php';
+        if (file_exists(S3AB_PLUGIN_DIR . 'admin/settings-page.php')) {
+            include S3AB_PLUGIN_DIR . 'admin/settings-page.php';
+        }
     }
     
-    // AJAX: 開始備份
+    // AJAX 處理方法保持不變...
+    // (使用之前提供的程式碼)
+    
     public function ajax_start_backup() {
         check_ajax_referer('s3ab_nonce', 'nonce');
         
@@ -183,7 +240,6 @@ class S3_Auto_Backup {
         }
     }
     
-    // AJAX: 列出備份
     public function ajax_list_backups() {
         check_ajax_referer('s3ab_nonce', 'nonce');
         
@@ -197,7 +253,6 @@ class S3_Auto_Backup {
         wp_send_json_success($backups);
     }
     
-    // AJAX: 還原備份
     public function ajax_restore_backup() {
         check_ajax_referer('s3ab_nonce', 'nonce');
         
@@ -217,7 +272,6 @@ class S3_Auto_Backup {
         }
     }
     
-    // AJAX: 刪除備份
     public function ajax_delete_backup() {
         check_ajax_referer('s3ab_nonce', 'nonce');
         
@@ -237,7 +291,6 @@ class S3_Auto_Backup {
         }
     }
     
-    // AJAX: 測試 S3 連線
     public function ajax_test_connection() {
         check_ajax_referer('s3ab_nonce', 'nonce');
         
@@ -255,7 +308,6 @@ class S3_Auto_Backup {
         }
     }
     
-    // 執行排程備份
     public function run_scheduled_backup() {
         $settings = get_option('s3ab_settings');
         
@@ -269,4 +321,6 @@ class S3_Auto_Backup {
 }
 
 // 初始化外掛
-S3_Auto_Backup::get_instance();
+add_action('plugins_loaded', function() {
+    S3_Auto_Backup::get_instance();
+});
