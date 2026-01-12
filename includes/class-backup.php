@@ -87,7 +87,7 @@ class S3AB_Backup {
                         if ($value === null) {
                             $values[] = 'NULL';
                         } else {
-                            $values[] = "'" . $wpdb->_escape($value) . "'";
+                            $values[] = "'" . $wpdb->_real_escape($value) . "'";
                         }
                     }
                     $sql .= "INSERT INTO `{$table_name}` VALUES (" . implode(', ', $values) . ");\n";

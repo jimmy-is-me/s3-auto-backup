@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: S3 Auto Backup Pro
- * Plugin URI: https://yoursite.com/s3-auto-backup
+ * Plugin URI: https://github.com/jimmy-is-me/s3-auto-backup
  * Description: 自動備份 WordPress 網站到 S3,支援一鍵還原
  * Version: 1.0.0
  * Author: wumetax
