@@ -33,8 +33,19 @@ $s3_settings = get_option('s3ab_s3_settings', array());
 $settings = get_option('s3ab_settings', array());
 ?>
 
-<div class="wrap">
+<div class="wrap s3ab-settings">
     <h1>S3 備份設定</h1>
+    
+    <div class="s3ab-info-box">
+        <p><strong>⚙️ 設定說明：</strong></p>
+        <ul>
+            <li><strong>S3 Endpoint：</strong>必填項目。請填入您使用的 S3 相容服務的完整 endpoint URL</li>
+            <li><strong>Bucket 名稱：</strong>您建立的儲存桶名稱</li>
+            <li><strong>Access Key 和 Secret Key：</strong>從您的 S3 服務提供商獲取的認證資訊</li>
+            <li>設定完成後，請務必點擊「測試連線」確認設定正確</li>
+            <li>支援的服務：AWS S3、DigitalOcean Spaces、Wasabi、Backblaze B2、iDrive e2 等所有 S3-Compatible 服務</li>
+        </ul>
+    </div>
     
     <form method="post" action="">
         <?php wp_nonce_field('s3ab_settings'); ?>

@@ -24,9 +24,19 @@
     font-size: 16px;
 }
 
+.s3ab-actions .button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+}
+
 .s3ab-actions .button .dashicons {
-    line-height: inherit;
-    margin-right: 5px;
+    width: 18px;
+    height: 18px;
+    font-size: 18px;
+    line-height: 1;
+    margin: 0;
     vertical-align: middle;
 }
 
@@ -245,6 +255,39 @@
 @keyframes s3ab-spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
+}
+
+/* ===============================================
+   說明資訊框
+   =============================================== */
+
+.s3ab-info-box {
+    background: #f0f6fc;
+    border-left: 4px solid #2271b1;
+    padding: 15px 20px;
+    margin: 20px 0;
+    border-radius: 4px;
+}
+
+.s3ab-info-box p {
+    margin: 0 0 10px 0;
+    font-size: 14px;
+}
+
+.s3ab-info-box ul {
+    margin: 10px 0 0 0;
+    padding-left: 20px;
+}
+
+.s3ab-info-box li {
+    margin: 5px 0;
+    line-height: 1.6;
+    font-size: 13px;
+    color: #50575e;
+}
+
+.s3ab-info-box strong {
+    color: #2271b1;
 }
 
 /* ===============================================

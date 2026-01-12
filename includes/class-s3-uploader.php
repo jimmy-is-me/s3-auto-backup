@@ -158,8 +158,22 @@ class S3AB_S3_Uploader {
     // === AWS Signature V4 實作 ===
     
     private function put_object($local_file, $s3_key) {
+        if (!file_exists($local_file)) {
+            throw new Exception('檔案不存在: ' . $local_file);
+        }
+        
         $content = file_get_contents($local_file);
-        $content_type = mime_content_type($local_file);
+        if ($content === false) {
+            throw new Exception('無法讀取檔案: ' . $local_file);
+        }
+        
+        $content_type = 'application/octet-stream';
+        if (function_exists('mime_content_type')) {
+            $detected = @mime_content_type($local_file);
+            if ($detected) {
+                $content_type = $detected;
+            }
+        }
         
         $url = $this->get_url($s3_key);
         $headers = $this->sign_request('PUT', $s3_key, $content, $content_type);
@@ -176,8 +190,19 @@ class S3AB_S3_Uploader {
         }
         
         $code = wp_remote_retrieve_response_code($response);
-        if ($code !== 200) {
-            throw new Exception('上傳失敗: HTTP ' . $code);
+        if ($code !== 200 && $code !== 201) {
+            $body = wp_remote_retrieve_body($response);
+            $error_msg = '上傳失敗: HTTP ' . $code;
+            if (!empty($body)) {
+                // 嘗試解析 XML 錯誤訊息
+                $xml = @simplexml_load_string($body);
+                if ($xml && isset($xml->Message)) {
+                    $error_msg .= ' - ' . (string)$xml->Message;
+                } else {
+                    $error_msg .= ' - ' . substr(strip_tags($body), 0, 200);
+                }
+            }
+            throw new Exception($error_msg);
         }
     }
     
@@ -259,16 +284,53 @@ class S3AB_S3_Uploader {
     }
     
     private function sign_request($method, $key, $payload = '', $content_type = 'application/octet-stream', $query_string = '') {
-        $host = parse_url($this->get_url(''), PHP_URL_HOST);
+        // 構建完整的 URL 以獲取 host 和路徑
+        $full_url = $this->get_url($key);
+        $parsed_url = parse_url($full_url);
+        $host = $parsed_url['host'];
+        
+        // 構建 canonical URI
+        // 從完整 URL 中提取路徑，移除 bucket 部分（如果存在）
+        $path = isset($parsed_url['path']) ? $parsed_url['path'] : '/';
+        
+        // 如果路徑包含 bucket，移除它（因為 canonical URI 不應包含 bucket）
+        $bucket_prefix = '/' . $this->bucket;
+        if (strpos($path, $bucket_prefix) === 0) {
+            $path = substr($path, strlen($bucket_prefix));
+        }
+        
+        // 確保以 / 開頭
+        if (empty($path) || $path[0] !== '/') {
+            $path = '/' . $path;
+        }
+        
+        // URL 編碼 canonical URI（AWS S3 規範：除了 / 之外都要編碼）
+        $canonical_uri = $this->uri_encode($path, false);
+        
         $timestamp = gmdate('Ymd\THis\Z');
         $date = gmdate('Ymd');
         
         $payload_hash = hash('sha256', $payload);
         
+        // 處理 query string
+        $canonical_querystring = '';
+        if (!empty($query_string)) {
+            // 移除前導的 ?
+            $query_string = ltrim($query_string, '?');
+            // 解析並排序查詢參數
+            parse_str($query_string, $params);
+            ksort($params);
+            $parts = array();
+            foreach ($params as $k => $v) {
+                $parts[] = $this->uri_encode($k, true) . '=' . $this->uri_encode($v, true);
+            }
+            $canonical_querystring = implode('&', $parts);
+        }
+        
         $canonical_headers = "host:{$host}\nx-amz-content-sha256:{$payload_hash}\nx-amz-date:{$timestamp}\n";
         $signed_headers = 'host;x-amz-content-sha256;x-amz-date';
         
-        $canonical_request = "{$method}\n/{$key}\n{$query_string}\n{$canonical_headers}\n{$signed_headers}\n{$payload_hash}";
+        $canonical_request = "{$method}\n{$canonical_uri}\n{$canonical_querystring}\n{$canonical_headers}\n{$signed_headers}\n{$payload_hash}";
         
         $scope = "{$date}/{$this->region}/s3/aws4_request";
         $string_to_sign = "AWS4-HMAC-SHA256\n{$timestamp}\n{$scope}\n" . hash('sha256', $canonical_request);
@@ -285,6 +347,24 @@ class S3AB_S3_Uploader {
             'Authorization' => $authorization,
             'Content-Type' => $content_type,
         );
+    }
+    
+    /**
+     * URI 編碼（AWS S3 規範）
+     */
+    private function uri_encode($uri, $encode_slash = false) {
+        $encoded = '';
+        for ($i = 0; $i < strlen($uri); $i++) {
+            $char = $uri[$i];
+            if (preg_match('/[A-Za-z0-9\-_.~]/', $char)) {
+                $encoded .= $char;
+            } elseif ($char === '/' && !$encode_slash) {
+                $encoded .= '/';
+            } else {
+                $encoded .= '%' . strtoupper(sprintf('%02x', ord($char)));
+            }
+        }
+        return $encoded;
     }
     
     private function get_signing_key($date) {
